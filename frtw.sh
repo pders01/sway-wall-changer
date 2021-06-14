@@ -3,51 +3,57 @@
 source settings.sh
 setting_repo_dl=$SETTING_REPO_DL
 config_path=$CONFIG_PATH
+working_dir=$1
 
-
-if [[ setting_repo_dl -eq True ]]
-	then
-        echo "Do you want to clone a repo containing wallpapers? You can disable this function in settings.sh [y/N]"
-        read repo_dl
-		case "$repo_dl" in
-		    [yY][eE][sS]|[yY]) 
-			echo "Please enter your repo url:"
-			read repo_url
-            dir_name=${repo_url##*/} 
-            dir_name=${dir_name%.*}
-            git clone $repo_url
-            cd $dir_name
-            ;;
-		    *)
-			;;
-		esac
+if [[ -n "$working_dir" ]]
+    then
+        cd "$working_dir" || exit
+        working_dir="$(pwd)"
+    elif [[ $setting_repo_dl -eq true ]]
+        then
+            printf "Do you want to clone a repo containing wallpapers?\n \
+                  You can disable this function in settings.sh [y/N]"
+            read -r repo_dl
+            case "$repo_dl" in
+                [yY][eE][sS]|[yY]) 
+                echo "Please enter your repo url:"
+                read -r repo_url
+                dir_name=${repo_url##*/} 
+                dir_name=${dir_name%.*}
+                git clone "$repo_url"
+                cd "$dir_name" || exit
+                ;;
+                *)
+                ;;
+            esac
 fi
 
 echo "You're in $(pwd)"
 
-sxiv * &
+sxiv ./* &
 
-prompt="Please select a wallpaper:"
-options=( $(find -maxdepth 1 -print0 | xargs -0) )
+unset options i
+while IFS= read -r -d $'\0' f; do
+  options[i++]="$f"
+done < <(find "$working_dir" -maxdepth 1 -type f -name "*.jpg" -print0 )
 
-PS3="$prompt "
-select opt in "${options[@]}" "Quit" ; do 
-    if (( REPLY == 1 + ${#options[@]} )) ; then
-        exit
+select opt in "${options[@]}" "Stop the script"; do
+  case $opt in
+    *.jpg)
+      echo "${opt}"
+      sed -i "s|exec swaybg -i.*|exec swaybg -i ${opt}|g" "$config_path"
+      break
+      ;;
+    "Quit")
+      echo "You chose to stop"
+      break
+      ;;
+  esac
+done
 
-    elif (( REPLY > 0 && REPLY <= ${#options[@]} )) ; then
-        echo "$(pwd)/${opt:2}"
-        sed -i "s|exec swaybg -i.*|exec swaybg -i $(pwd)/${opt:2}|g" $config_path
-        break
 
-    else
-        echo "Invalid option. Try another one."
-    fi
-done    
 
 # here you'll have to adjust setting the wallpaper in whatever DE or WM your using
-
-echo $selected_wallpaper
 
 
 
